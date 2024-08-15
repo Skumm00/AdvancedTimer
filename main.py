@@ -1,38 +1,73 @@
-#import the required libraries
-import time
-import threading
+#import the required random libraries
+import random
 
-def countdown(t):
-  
-  #takes an int t and counts down from t to 0, printing each number from it
-  
-  while t:
-    mins, secs = divmod(t, 60)
-    timer = '{:02d}:{:02d}'.format(mins, secs)
-    print(timer, end="\r")
-    time.sleep(1)
-    t -= 1
-  print('Countdown complete!')
+def generate_word(word_list):
+    return random.choice(word_list)
 
-def display_message(message):
+def get_guess():
+    while True:
+        guess = input("Enter your guess: ").lower()
+        if len(guess) == 1 and guess.isalpha():
+            return guess
+        else:
+            print("Please enter only one letter.")
 
-  time.sleep(5)  # Wait for 5 seconds before displaying the message
-  print(message)
+def check_guess(guess, word):
+    if guess in word:
+        return f"Good guess! {guess} is in the word."
+    else:
+        return f"Sorry, {guess} is not in the word."
 
-# Get input from the user for the countdown duration
-duration = int(input("Enter the countdown duration in seconds: "))
+def is_palindrome(word):
+    return word == word[::-1]
 
-# Start the countdown
-countdown_thread = threading.Thread(target=countdown, args=(duration,))
-countdown_thread.start()
+def provide_hint(word, guesses):
+    hint = ""
+    for letter in word:
+        if letter in guesses:
+            hint += letter
+        else:
+            hint += "_"
+    return f"Hint: {hint}"
 
-# Get input from the user for the message to be displayed
-message = input("Enter a message to be displayed after the countdown: ")
+def play_game(difficulty, word_list):
+    word = generate_word(word_list)
+    word_set = set(word)
+    guesses = []
+    max_guesses = {'easy': 7, 'medium': 5, 'hard': 3}[difficulty]
+    print(f"\nDifficulty: {difficulty.capitalize()}")
+    print(f"The word is {len(word)} letters long.")
+    print("Hint: It's a palindrome!")
 
-# Start a separate thread to display the message
-message_thread = threading.Thread(target=display_message, args=(message,))
-message_thread.start()
+    while len(guesses) < max_guesses:
+        guess = get_guess()
+        if guess in guesses:
+            print("You already guessed that letter. Try again.")
+        else:
+            guesses.append(guess)
+            print(check_guess(guess, word))
 
-# Wait for both threads to finish
-countdown_thread.join()
-message_thread.join()
+            guessed_letters = set(guesses)
+            if guessed_letters == word_set:
+                print(f"Congratulations! You guessed the word: {word}.")
+                return True
+
+            guessed_letters_str = "".join(sorted(guesses))
+            if is_palindrome(guessed_letters_str):
+                print("You've guessed a palindrome!")
+
+            if difficulty == 'hard' and len(guesses) == max_guesses - 2:
+                print("Warning: You're close to running out of guesses!")
+            if difficulty == 'medium' and len(guesses) == max_guesses - 3:
+                print("Hint: You're getting closer!")
+
+            # Provide a hint if guesses are getting low
+            if len(guesses) >= max_guesses - 3:
+                print(provide_hint(word, guesses))
+
+    print(f"Sorry, you ran out of guesses! The word was {word}")
+    return False
+
+
+if __name__ == "__main__":
+    main()
