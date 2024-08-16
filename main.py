@@ -1,73 +1,84 @@
-#import the required random libraries
-import random
+#import the required libraries~!
 
-def generate_word(word_list):
-    return random.choice(word_list)
+import time
+import threading
+import logging
 
-def get_guess():
+# Configure logging
+logging.basicConfig(filename='countdown_log.txt', level=logging.INFO, format='%(asctime)s - %(message)s')
+
+def countdown(t, event):
+    """Counts down from t to 0, printing each number and logging the progress."""
+    logging.info(f'Starting countdown for {t} seconds.')
+    while t:
+        mins, secs = divmod(t, 60)
+        timer = '{:02d}:{:02d}'.format(mins, secs)
+        print(timer, end="\r")
+        time.sleep(1)
+        t -= 1
+    print('Countdown complete!')
+    logging.info('Countdown complete.')
+    event.set()  # Signal that the countdown is complete
+
+def display_message(message, event):
+    """Waits until the countdown is complete and then displays the message."""
+    event.wait()
+    print(message)
+    logging.info(f'Message displayed: {message}')
+
+def get_valid_integer(prompt):
+    """Prompts the user for an integer and validates the input."""
     while True:
-        guess = input("Enter your guess: ").lower()
-        if len(guess) == 1 and guess.isalpha():
-            return guess
-        else:
-            print("Please enter only one letter.")
+        try:
+            value = int(input(prompt))
+            if value <= 0:
+                print("Please enter a positive integer.")
+            else:
+                return value
+        except ValueError:
+            print("Invalid input. Please enter a valid integer.")
 
-def check_guess(guess, word):
-    if guess in word:
-        return f"Good guess! {guess} is in the word."
-    else:
-        return f"Sorry, {guess} is not in the word."
+def main():
+    while True:
+        try:
+            num_countdowns = get_valid_integer("How many countdowns would you like to set? ")
+            break
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
-def is_palindrome(word):
-    return word == word[::-1]
+    for i in range(num_countdowns):
+        print(f"\nCountdown {i + 1}:")
+        duration = get_valid_integer("Enter the countdown duration in seconds: ")
 
-def provide_hint(word, guesses):
-    hint = ""
-    for letter in word:
-        if letter in guesses:
-            hint += letter
-        else:
-            hint += "_"
-    return f"Hint: {hint}"
+        # Create an event object to signal the end of the countdown
+        countdown_complete_event = threading.Event()
 
-def play_game(difficulty, word_list):
-    word = generate_word(word_list)
-    word_set = set(word)
-    guesses = []
-    max_guesses = {'easy': 7, 'medium': 5, 'hard': 3}[difficulty]
-    print(f"\nDifficulty: {difficulty.capitalize()}")
-    print(f"The word is {len(word)} letters long.")
-    print("Hint: It's a palindrome!")
+        # Start the countdown
+        countdown_thread = threading.Thread(target=countdown, args=(duration, countdown_complete_event))
+        countdown_thread.start()
 
-    while len(guesses) < max_guesses:
-        guess = get_guess()
-        if guess in guesses:
-            print("You already guessed that letter. Try again.")
-        else:
-            guesses.append(guess)
-            print(check_guess(guess, word))
+        # Get input from the user for the message to be displayed
+        message = input("Enter a message to be displayed after the countdown: ")
 
-            guessed_letters = set(guesses)
-            if guessed_letters == word_set:
-                print(f"Congratulations! You guessed the word: {word}.")
-                return True
+        # Start a separate thread to display the message
+        message_thread = threading.Thread(target=display_message, args=(message, countdown_complete_event))
+        message_thread.start()
 
-            guessed_letters_str = "".join(sorted(guesses))
-            if is_palindrome(guessed_letters_str):
-                print("You've guessed a palindrome!")
+        # Wait for both threads to finish
+        countdown_thread.join()
+        message_thread.join()
 
-            if difficulty == 'hard' and len(guesses) == max_guesses - 2:
-                print("Warning: You're close to running out of guesses!")
-            if difficulty == 'medium' and len(guesses) == max_guesses - 3:
-                print("Hint: You're getting closer!")
+        # Prompt to run another countdown or exit
+        while True:
+            again = input("Would you like to set another countdown? (yes/no): ").strip().lower()
+            if again in ['yes', 'no']:
+                break
+            print("Invalid input. Please type 'yes' or 'no'.")
 
-            # Provide a hint if guesses are getting low
-            if len(guesses) >= max_guesses - 3:
-                print(provide_hint(word, guesses))
-
-    print(f"Sorry, you ran out of guesses! The word was {word}")
-    return False
-
+        if again == 'no':
+            print("Thank you for using the countdown program!")
+            logging.info('Program terminated by user.')
+            break
 
 if __name__ == "__main__":
     main()
