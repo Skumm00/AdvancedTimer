@@ -1,0 +1,8 @@
+2024-08-17 02:15:37,129 - Starting countdown for 9 seconds.
+2024-08-17 02:15:46,137 - Countdown complete.
+2024-08-17 02:15:58,530 - Starting countdown for 50 seconds.
+2024-08-17 02:16:48,581 - Countdown complete.
+2024-08-17 02:16:48,581 - Message displayed: Hey Wake up!
+2024-08-17 02:26:40,272 - Starting countdown for 1 seconds.
+2024-08-17 02:26:41,274 - Countdown complete.
+2024-08-17 02:26:44,994 - Message displayed: 2
