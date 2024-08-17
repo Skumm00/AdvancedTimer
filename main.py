@@ -3,6 +3,7 @@ import time
 import threading
 import logging
 import json
+import os
 
 # Configure logging
 logging.basicConfig(filename='countdown_log.txt', level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -14,11 +15,11 @@ class CountdownTimer:
         self.paused = False
         self.lock = threading.Lock()
         self.event = threading.Event()
-        self.name = name  # Added a name for each countdown timer
+        self.name = name
 
     def countdown(self):
         logging.info(f'Starting countdown for {self.name} ({self.duration} seconds).')
-        while self.remaining_time:
+        while self.remaining_time > 0:
             if self.paused:
                 time.sleep(1)
                 continue
@@ -32,7 +33,7 @@ class CountdownTimer:
 
         print(f"{self.name}: Countdown complete!")
         logging.info(f'Countdown complete for {self.name}.')
-        self.event.set()  # Signal that the countdown is complete
+        self.event.set()
 
     def pause(self):
         with self.lock:
@@ -50,14 +51,19 @@ class CountdownTimer:
     def is_complete(self):
         return self.remaining_time == 0
 
+    def get_status(self):
+        return {
+            'name': self.name,
+            'remaining_time': self.remaining_time,
+            'paused': self.paused
+        }
+
 def display_message(message, event):
-    # Waits until the countdown is complete and then displays the message
     event.wait()
     print(message)
     logging.info(f'Message displayed: {message}')
 
 def get_valid_integer(prompt):
-    # Prompts the user for an integer and validates the input
     while True:
         try:
             value = int(input(prompt))
@@ -69,7 +75,6 @@ def get_valid_integer(prompt):
             print("Invalid input. Please enter a valid integer.")
 
 def get_valid_string(prompt):
-    # Prompts the user for a non-empty string
     while True:
         value = input(prompt).strip()
         if value:
@@ -77,7 +82,6 @@ def get_valid_string(prompt):
         print("Input cannot be empty. Please try again.")
 
 def save_configurations(config):
-    # Save configurations to a JSON file
     try:
         with open('countdown_config.json', 'w') as file:
             json.dump(config, file, indent=4)
@@ -87,7 +91,6 @@ def save_configurations(config):
         logging.error(f"Failed to save configurations: {e}")
 
 def load_configurations():
-    # Load configurations from a JSON file
     try:
         with open('countdown_config.json', 'r') as file:
             return json.load(file)
@@ -99,9 +102,7 @@ def load_configurations():
         return []
 
 def delete_configuration():
-    # Delete the configuration file
     try:
-        import os
         os.remove('countdown_config.json')
         print("Configuration file deleted.")
     except IOError as e:
@@ -109,17 +110,54 @@ def delete_configuration():
         logging.error(f"Failed to delete configuration file: {e}")
 
 def list_configurations(configurations):
-    # List all saved configurations
     if not configurations:
         print("No configurations found.")
     else:
         for idx, cfg in enumerate(configurations, start=1):
             print(f"Config {idx}: Duration: {cfg.get('duration')} seconds, Message: {cfg.get('message')}")
 
+def check_status(timers):
+    for timer in timers:
+        status = timer.get_status()
+        status_str = f"Name: {status['name']}, Remaining Time: {status['remaining_time']} seconds, Paused: {status['paused']}"
+        print(status_str)
+
+def display_remaining_time(timers):
+    for timer in timers:
+        mins, secs = divmod(timer.remaining_time, 60)
+        timer_str = '{:02d}:{:02d}'.format(mins, secs)
+        print(f"{timer.name}: {timer_str}")
+
+def save_preferences(preferences):
+    try:
+        with open('user_preferences.json', 'w') as file:
+            json.dump(preferences, file, indent=4)
+        print("User preferences saved.")
+    except IOError as e:
+        print(f"Failed to save user preferences: {e}")
+        logging.error(f"Failed to save user preferences: {e}")
+
+def load_preferences():
+    try:
+        with open('user_preferences.json', 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"Error reading preferences file: {e}")
+        logging.error(f"Error reading preferences file: {e}")
+        return {}
+
 def main():
+    countdown_threads = []
+    message_threads = []
+    timers = []
+
+    preferences = load_preferences()
+
     while True:
         try:
-            action = input("Choose an action - [1] Set countdowns, [2] List configurations, [3] Delete configurations, [4] Exit: ").strip()
+            action = input("Choose an action - [1] Set countdowns, [2] List configurations, [3] Delete configurations, [4] Check status, [5] Display remaining time, [6] Save preferences, [7] Exit: ").strip()
             if action == '1':
                 num_countdowns = get_valid_integer("How many countdowns would you like to set? ")
                 configurations = load_configurations()
@@ -130,19 +168,18 @@ def main():
                     name = get_valid_string("Enter a name for this countdown: ")
 
                     timer = CountdownTimer(duration, name)
+                    timers.append(timer)
 
-                    # Create an event object to signal the end of the countdown
                     countdown_thread = threading.Thread(target=timer.countdown)
+                    countdown_threads.append(countdown_thread)
                     countdown_thread.start()
 
-                    # Get input from the user for the message to be displayed
                     message = get_valid_string("Enter a message to be displayed after the countdown: ")
 
-                    # Start a separate thread to display the message
                     message_thread = threading.Thread(target=display_message, args=(message, timer.event))
+                    message_threads.append(message_thread)
                     message_thread.start()
 
-                    # Allow user to pause and resume countdown
                     while True:
                         action = input("Would you like to pause, resume, adjust, or continue? (pause/resume/adjust/continue): ").strip().lower()
                         if action == 'pause':
@@ -163,12 +200,10 @@ def main():
                     countdown_thread.join()
                     message_thread.join()
 
-                    # Save the configuration if user wants
                     if input("Would you like to save the current configuration? (yes/no): ").strip().lower() == 'yes':
                         configurations.append({'name': name, 'duration': duration, 'message': message})
                         save_configurations(configurations)
 
-                    # Prompt to run another countdown or exit
                     while True:
                         again = input("Would you like to set another countdown? (yes/no): ").strip().lower()
                         if again in ['yes', 'no']:
@@ -178,7 +213,7 @@ def main():
                     if again == 'no':
                         print("Thank you for using the countdown program!")
                         logging.info('Program terminated by user.')
-                        break
+                        return
 
             elif action == '2':
                 configurations = load_configurations()
@@ -189,9 +224,21 @@ def main():
                     delete_configuration()
 
             elif action == '4':
+                check_status(timers)
+
+            elif action == '5':
+                display_remaining_time(timers)
+
+            elif action == '6':
+                preferred_format = get_valid_string("Enter your preferred time format (e.g., HH:MM:SS or MM:SS): ")
+                preferences['time_format'] = preferred_format
+                save_preferences(preferences)
+                print("Preferences saved.")
+
+            elif action == '7':
                 print("Exiting program. Thank you!")
                 logging.info('Program exited by user.')
-                break
+                return
 
             else:
                 print("Invalid choice. Please try again.")
@@ -202,5 +249,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
